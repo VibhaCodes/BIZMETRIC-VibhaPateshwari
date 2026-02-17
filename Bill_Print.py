@@ -1,0 +1,303 @@
+# 1. Bill Print
+Sr= int(input("Enter the serial number: "))
+Menu = input("Enter the dish want to order: ")
+Quant= int(input("Enter the quantity: "))
+Price = int(input("Enter the price: "))
+print("--------------------------------------------------------")
+print("{:^40}".format('Welcome-Hotel-Name')) 
+print("--------------------------------------------------------")
+print("Sr.    Menu.              Quant.         Price")
+print("{:<6} {:<20} {:<5} {:>10}".format(Sr, Menu, Quant, Price))
+print("                                                ")
+print("                                                ")
+print("--------------------------------------------------------")
+print("{:>10}".format("Total Price:"),"Rs", Quant*Price) 
+
+print("--------------------------------------------------------")
+
+
+
+
+
+
+
+
+
+##############
+#2. USING FUNCTIONS
+##############
+
+# # 
+# take order and store in dict
+# deliver the order
+# generate bill
+# print the bill
+
+class Restaurant:
+
+    def __init__(self, name):
+        self.name = name
+        self.orders = {}   # dictionary to store order
+
+    def take_order(self, sr_num, menu, quantity, price):
+        self.orders["SrNo"] = sr_num
+        self.orders["Menu"] = menu
+        self.orders["Quantity"] = quantity
+        self.orders["Price"] = price
+
+    def generate_bill(self):
+        line = "-" * 50
+        total = self.orders["Quantity"] * self.orders["Price"]
+
+        bill_text = ""
+        bill_text += f"{line:^50}\n"
+        bill_text += f"{':Welcome to ' + self.name + ':':^50}\n"
+        bill_text += f"{line:^50}\n"
+
+        bill_text += "{:2} {:^8} {:^15} {:^20}\n".format(
+            'SrNo.', 'Menu', 'Quantity', 'Price'
+        )
+
+        bill_text += "{0:2} {1:^14} {2:^8} {3:^27}\n".format(
+            self.orders["SrNo"],
+            self.orders["Menu"],
+            self.orders["Quantity"],
+            self.orders["Price"]
+        )
+
+        bill_text += "\n"
+        bill_text += f"{line:^50}\n"
+        bill_text += f"Total amount: {total}\n"
+        bill_text += f"{line:^50}\n"
+
+        return bill_text
+
+
+
+hotel = Restaurant("Shiv Sagar")
+
+sr_num = input("Enter serial number: ")
+menu = input("Enter the menu : ")
+quantity = int(input("Enter the quantity: "))
+price = int(input("Enter the price: "))
+
+hotel.take_order(sr_num, menu, quantity, price)
+
+print(hotel.generate_bill())
+
+
+
+sr_num = input("Enter serial number: ")
+menu = input("Enter the menu : ")
+quantity = int(input("Enter the quantity: "))
+price = int(input("Enter the price: "))
+
+
+
+line = "----------------------------------------------------"
+
+bill_text = ""
+bill_text += "{:^50}\n".format(line)
+bill_text += "{:^50}\n".format(":Welcome to Shiv Sagar:")
+bill_text += "{:^50}\n".format(line)
+
+bill_text += "{:2} {:^8} {:^15} {:^20}\n".format('SrNo.','Menu', 'Quantity', 'Price')
+bill_text += "{0:2} {1:^14} {2:^8} {3:^27}\n".format(sr_num, menu, quantity, price)
+
+bill_text += "\n"
+bill_text += "{:^50}\n".format(line)
+bill_text += "Total amount: {}\n".format(quantity * price)
+bill_text += "{:^50}\n".format(line)
+
+print(bill_text)
+
+
+
+
+
+
+
+
+
+####
+## 3. USING THE DATABASE
+####
+
+
+# 
+import sqlite3
+from datetime import datetime
+
+
+DB_NAME = "restaurant.db"
+
+
+class Restaurant:
+    def __init__(self, name):
+        self.name = name
+        self.conn = sqlite3.connect(DB_NAME)
+        self.cursor = self.conn.cursor()
+        self.create_tables()
+        self.seed_menu()
+
+    def create_tables(self):
+
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS menu (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                price REAL NOT NULL
+            )
+        """)
+
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS orders (
+                order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                menu_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                price REAL NOT NULL,
+                total_amount REAL NOT NULL,
+                order_time TEXT NOT NULL,
+                FOREIGN KEY(menu_id) REFERENCES menu(id)
+            )
+        """)
+
+        self.conn.commit()
+
+    def seed_menu(self):
+        items = [
+            ("Dosa", 80),
+            ("Idli", 50),
+            ("Vada", 40),
+            ("Poha", 35),
+            ("Tea", 20),
+            ("Coffee", 30)
+        ]
+
+        for name, price in items:
+            self.cursor.execute("""
+                INSERT OR IGNORE INTO menu (name, price)
+                VALUES (?, ?)
+            """, (name.lower(), price))
+
+        self.conn.commit()
+
+    def show_menu(self):
+        print("\n----- MENU -----")
+        self.cursor.execute("SELECT id, name, price FROM menu")
+        rows = self.cursor.fetchall()
+        for r in rows:
+            print(f"{r[0]}. {r[1].title()} - ₹{r[2]}")
+        print("----------------")
+
+    def get_menu_item(self, menu_name):
+        self.cursor.execute("""
+            SELECT id, name, price
+            FROM menu
+            WHERE name = ?
+        """, (menu_name.lower(),))
+        return self.cursor.fetchone()
+
+    def take_order(self, menu_name, quantity):
+        item = self.get_menu_item(menu_name)
+
+        if item is None:
+            print("Menu item not found.")
+            return None
+
+        if quantity <= 0:
+            print("Quantity must be greater than 0.")
+            return None
+
+        menu_id, name, price = item
+        total = price * quantity
+        order_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        self.cursor.execute("""
+            INSERT INTO orders (menu_id, quantity, price, total_amount, order_time)
+            VALUES (?, ?, ?, ?, ?)
+        """, (menu_id, quantity, price, total, order_time))
+
+        self.conn.commit()
+
+        return {
+            "menu_id": menu_id,
+            "menu_name": name,
+            "quantity": quantity,
+            "price": price,
+            "total_amount": total
+        }
+
+
+    def generate_bill(self, orders_list):
+
+        line = "-" * 50
+        bill = ""
+
+        bill += line + "\n"
+        bill += f"{('Welcome to ' + self.name):^50}\n"
+        bill += line + "\n"
+        bill += f"Time : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        bill += line + "\n"
+
+        bill += "{:<8} {:<12} {:<6} {:<8} {:<10}\n".format(
+            "ID", "Item", "Qty", "Price", "LineTotal"
+        )
+
+        bill += line + "\n"
+
+        grand_total = 0
+
+        for order in orders_list:
+            bill += "{:<8} {:<12} {:<6} {:<8} {:<10}\n".format(
+                order["menu_id"],
+                order["menu_name"].title(),
+                order["quantity"],
+                order["price"],
+                order["total_amount"]
+            )
+            grand_total += order["total_amount"]
+
+        bill += line + "\n"
+        bill += f"Grand Total: ₹{grand_total}\n"
+        bill += line + "\n"
+
+        return bill
+
+    def close(self):
+        self.cursor.close()
+        self.conn.close()
+
+
+
+if __name__ == "__main__":
+
+    hotel = Restaurant("Shiv Sagar")
+    hotel.show_menu()
+
+    all_orders = []
+
+    while True:
+        menu = input("Enter menu item name (or 'done'): ").strip()
+
+        if menu.lower() == "done":
+            break
+
+        try:
+            quantity = int(input("Enter quantity: "))
+        except ValueError:
+            print("Enter valid quantity.")
+            continue
+
+        order = hotel.take_order(menu, quantity)
+
+        if order:
+            all_orders.append(order)
+
+    if all_orders:
+        bill_text = hotel.generate_bill(all_orders)
+        print("\n" + bill_text)
+    else:
+        print("No items ordered.")
+
+    hotel.close()
